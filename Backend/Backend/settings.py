@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'SpeechText',
     'myapp',
     'transcript',
-    'keyapp'
+    'keyapp',
+    'channels'
 ]
 
 MIDDLEWARE = [
