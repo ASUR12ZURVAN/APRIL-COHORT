@@ -11,15 +11,43 @@ from rest_framework.response import Response
 from rest_framework import status
 
 
-from transformers import pipeline
+import requests 
+import re
 
+HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english"
+HUGGINGFACE_API_TOKEN = "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"
 
-sentiment_pipeline = pipeline("sentiment-analysis",device=-1)
-classifier = pipeline(
-    "sentiment-analysis",
-    model="distilbert-base-uncased-finetuned-sst-2-english",
-    revision="714eb0f"
-)
+def get_sentiment_from_huggingface(transcript_text):
+    headers = {
+        "Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(
+        HUGGINGFACE_API_URL,
+        headers=headers,
+        json={"inputs": transcript_text}
+    )
+
+    if response.status_code == 200:
+        results = response.json()
+
+        # Handle list of results (e.g. for single input string)
+        if isinstance(results, list):
+            # If it's a list of dicts (e.g. one sentence or batched sentences)
+            if all(isinstance(r, dict) for r in results):
+                result = results[0]
+                return f"{result['label']} ({result['score']:.2f})"
+            # If it's a list of lists (multiple predictions for multiple inputs)
+            elif all(isinstance(r, list) for r in results):
+                # Take the first prediction of the first input
+                result = results[0][0]
+                return f"{result['label']} ({result['score']:.2f})"
+        raise Exception("Unexpected response format from Hugging Face API")
+
+    else:
+        raise Exception(f"Hugging Face API error: {response.status_code} - {response.text}")
+
 
 
 # -------- USER --------
@@ -59,29 +87,26 @@ def delete_user(request, pk):
 # -------- CALL --------
 @api_view(['POST'])
 def create_call_with_sentiment(request):
-    # Extract all fields except avg_sentiment
     input_data = request.data.copy()
 
-    # Check required fields
     required_fields = ['caller_number', 'call_duration', 'call_instance', 'transcript', 'audio_link']
     missing = [field for field in required_fields if field not in input_data]
     if missing:
         return Response({'error': f'Missing fields: {", ".join(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Analyze sentiment from transcript
-    transcript_text = input_data['transcript']
-    result = sentiment_pipeline(transcript_text)[0]
-    sentiment = f"{result['label']} ({result['score']:.2f})"
+    try:
+        sentiment = get_sentiment_from_huggingface(input_data['transcript'])
+        input_data['avg_sentiment'] = sentiment
 
-    # Add avg_sentiment to data before serialization
-    input_data['avg_sentiment'] = sentiment
+        serializer = CallSerializer(data=input_data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer = CallSerializer(data=input_data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(['GET'])
 def get_all_calls(request):
     calls = call.objects.all()
