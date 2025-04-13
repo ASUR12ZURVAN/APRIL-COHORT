@@ -5,14 +5,14 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 
 
-# Load model once globally
-model_name = "distilbert-base-uncased-finetuned-sst-2-english"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSequenceClassification.from_pretrained(model_name)
-sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
-
 class SentimentConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        # Lazy-load the model only when WebSocket is connected
+        self.model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
+        self.sentiment_pipeline = pipeline("sentiment-analysis", model=self.model, tokenizer=self.tokenizer)
+        
         await self.accept()
         await self.send(text_data=json.dumps({"message": "Connected to Sentiment WebSocket"}))
 
@@ -22,7 +22,7 @@ class SentimentConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         transcript_text = data.get("transcript", "")
-        if(transcript_text):
+        if transcript_text:
             print("Transcript received in the consumer.py")
 
         turns = re.split(r'(?<=[.?!])\s+', transcript_text.strip())
@@ -32,7 +32,7 @@ class SentimentConsumer(AsyncWebsocketConsumer):
         sentiment_results = []
 
         for i, turn in enumerate(caller_turns):
-            result = sentiment_pipeline(turn)[0]
+            result = self.sentiment_pipeline(turn)[0]
             sentiment = result["label"]
             score = result["score"]
             signed_score = score if sentiment == "POSITIVE" else -score

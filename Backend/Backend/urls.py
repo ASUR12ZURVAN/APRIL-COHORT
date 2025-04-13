@@ -23,4 +23,5 @@ urlpatterns = [
     path("myapp/", include("myapp.urls")),
     path("keyapp/",include("keyapp.urls")),
     path("", include("storage.urls")),
+    path("transcript",include("transcript.urls"))
 ]

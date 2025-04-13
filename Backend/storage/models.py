@@ -38,4 +38,4 @@ class Lead(models.Model):
     company_name = models.CharField(max_length=100)
 
     def __str__(self):
-        return Lead.Name
+        return self.Name
