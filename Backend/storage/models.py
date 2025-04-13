@@ -13,7 +13,7 @@ class user(models.Model):
     
 class call(models.Model):
     caller_number = models.CharField(max_length=40)
-    call_duration = models.TimeField()
+    call_duration = models.CharField()
     call_instance = models.CharField(max_length=50)  #iska matlab hai ki call kab hua tha
     transcript = models.CharField(max_length=1000)
     audio_link = models.TextField()
