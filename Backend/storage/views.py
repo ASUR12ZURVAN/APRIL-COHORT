@@ -13,10 +13,11 @@ from rest_framework import status
 
 from transformers import pipeline
 
-sentiment_pipeline = pipeline("sentiment-analysis")
+
+sentiment_pipeline = pipeline("sentiment-analysis",device=-1)
 classifier = pipeline(
     "sentiment-analysis",
-    model="distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+    model="distilbert-base-uncased-finetuned-sst-2-english",
     revision="714eb0f"
 )
 
